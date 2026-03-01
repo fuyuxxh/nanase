@@ -58,6 +58,14 @@ async function execute(
     const selectedType = interaction.options.getString("type", true);
     const file = interaction.options.getAttachment("file", true) as Attachment;
     const name = interaction.options.getString("name", true);
+
+    // 禁則文字チェック
+    if (/[\\/:*?"<>|]/.test(name)) {
+        await interaction.followUp({ content: 'Error: コマンド名に次の文字は使用できません: \ / : * ? " < > |', flags: MessageFlags.Ephemeral });
+        console.log(`Error: Invalid characters in command name "${name}".`);
+        return;
+    }
+
     const ext = path.extname(file.name).toLowerCase();
     const filename = `${name}${ext}`;
 

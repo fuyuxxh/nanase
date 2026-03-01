@@ -3,8 +3,9 @@ import connect from "./gateway/connect";
 import disconnect from "./gateway/disconnect";
 import upload from "./upload/upload";
 import soundboard from "./upload/soundboard";
+import reply from "./upload/reply";
 
-const commands = [connect, disconnect, upload, soundboard];
+const commands = [connect, disconnect, upload, soundboard, reply];
 
 interface BootStrapOptions {
     isDeveloper: boolean;
