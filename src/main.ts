@@ -1,12 +1,19 @@
-import { ChatInputCommandInteraction, Client, Events, REST, Routes } from "discord.js";
-import connect from "./gateway/connect";
-import disconnect from "./gateway/disconnect";
-import upload from "./upload/upload";
-import soundboard from "./upload/soundboard";
-import reply from "./upload/reply";
-import { setupRespondent } from "./upload/respondent";
+import { AutocompleteInteraction, ChatInputCommandInteraction, Client, Events, REST, Routes, SharedSlashCommand } from "discord.js";
+import connect from "./gateway/connect.ts";
+import disconnect from "./gateway/disconnect.ts";
+import upload from "./upload/upload.ts";
+import soundboard from "./upload/soundboard.ts";
+import reply from "./upload/reply.ts";
+import { setupRespondent } from "./upload/respondent.ts";
+import ytdl from "./download/ytdl.ts";
 
-const commands = [connect, disconnect, upload, soundboard, reply];
+interface Command {
+    data: SharedSlashCommand;
+    execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
+    autocomplete?: (interaction: AutocompleteInteraction) => Promise<void>;
+}
+
+const commands: Command[] = [connect, disconnect, upload, soundboard, reply, ytdl];
 
 interface BootStrapOptions {
     isDeveloper: boolean;
@@ -61,8 +68,8 @@ export function bootStrap(client: Client, options: BootStrapOptions): void {
         // オートコンプリート
         if (interaction.isAutocomplete()) {
             const command = commands.find((cmd) => cmd.data.name === interaction.commandName);
-            if (command && "autocomplete" in command) {
-                await (command as any).autocomplete(interaction);
+            if (command?.autocomplete) {
+                await command.autocomplete(interaction);
             }
             return;
         }

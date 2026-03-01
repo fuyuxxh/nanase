@@ -1,6 +1,5 @@
 import { Client, Events } from "discord.js";
-import fs from "fs";
-import path from "path";
+import { join, parse } from "@std/path";
 
 export function setupRespondent(client: Client): void {
     client.on(Events.MessageCreate, async (message) => {
@@ -8,44 +7,42 @@ export function setupRespondent(client: Client): void {
         if (message.author.bot || !message.guild) return;
 
         const guildId = message.guild.id;
-        const imageDir = path.join("./resources", "image", guildId);
-        const textDir = path.join("./resources", "text", guildId);
+        const imageDir = join("./resources", "image", guildId);
+        const textDir = join("./resources", "text", guildId);
 
         // --- 画像アップロードの対応 ---
-        if (fs.existsSync(imageDir)) {
-            try {
-                const files = fs.readdirSync(imageDir);
-                for (const file of files) {
-                    const parsedPath = path.parse(file);
-                    if (parsedPath.name === message.content) {
-                        const filePath = path.join(imageDir, file);
-                        await message.reply({ files: [filePath] });
-                        console.log(`Responded to "${message.content}" with image ${file} in guild ${message.guild.name}.`);
-                        return; // 画像で返信したらここで終了
-                    }
+        try {
+            const files = [...Deno.readDirSync(imageDir)];
+            for (const entry of files) {
+                if (!entry.isFile) continue;
+                const parsedPath = parse(entry.name);
+                if (parsedPath.name === message.content) {
+                    const filePath = join(imageDir, entry.name);
+                    await message.reply({ files: [filePath] });
+                    console.log(`Responded to "${message.content}" with image ${entry.name} in guild ${message.guild.name}.`);
+                    return;
                 }
-            } catch (error) {
-                console.error(`Error reading image directory for guild ${guildId}:`, error);
             }
+        } catch {
+            // ディレクトリが存在しない場合は無視
         }
 
         // --- テキスト返信の対応 ---
-        if (fs.existsSync(textDir)) {
-            try {
-                const files = fs.readdirSync(textDir);
-                for (const file of files) {
-                    const parsedPath = path.parse(file);
-                    if (parsedPath.name === message.content && parsedPath.ext === ".txt") {
-                        const filePath = path.join(textDir, file);
-                        const replyContent = fs.readFileSync(filePath, "utf-8");
-                        await message.reply({ content: replyContent });
-                        console.log(`Responded to "${message.content}" with text ${file} in guild ${message.guild.name}.`);
-                        return; // テキストで返信したらここで終了
-                    }
+        try {
+            const files = [...Deno.readDirSync(textDir)];
+            for (const entry of files) {
+                if (!entry.isFile) continue;
+                const parsedPath = parse(entry.name);
+                if (parsedPath.name === message.content && parsedPath.ext === ".txt") {
+                    const filePath = join(textDir, entry.name);
+                    const replyContent = Deno.readTextFileSync(filePath);
+                    await message.reply({ content: replyContent });
+                    console.log(`Responded to "${message.content}" with text ${entry.name} in guild ${message.guild.name}.`);
+                    return;
                 }
-            } catch (error) {
-                console.error(`Error reading text directory for guild ${guildId}:`, error);
             }
+        } catch {
+            // ディレクトリが存在しない場合は無視
         }
     });
 }

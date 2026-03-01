@@ -13,9 +13,8 @@ import {
     AudioPlayerStatus,
     NoSubscriberBehavior,
 } from "@discordjs/voice";
-import { connectToChannel } from "../gateway/connect";
-import fs from "fs";
-import path from "path";
+import { connectToChannel } from "../gateway/connect.ts";
+import { join, extname, basename } from "@std/path";
 
 const audioDir = "./resources/audio";
 
@@ -34,16 +33,19 @@ const data = new SlashCommandBuilder()
  * 指定ギルドの音声ファイル一覧を取得（拡張子なし）
  */
 function getAudioFiles(guildId: string): { name: string; file: string }[] {
-    const dir = path.join(audioDir, guildId);
+    const dir = join(audioDir, guildId);
 
-    if (!fs.existsSync(dir)) return [];
-
-    return fs.readdirSync(dir)
-        .filter((f) => [".mp3", ".wav", ".m4a", ".ogg"].includes(path.extname(f).toLowerCase()))
-        .map((f) => ({
-            name: path.basename(f, path.extname(f)),
-            file: f,
-        }));
+    try {
+        const entries = [...Deno.readDirSync(dir)];
+        return entries
+            .filter((e) => e.isFile && [".mp3", ".wav", ".m4a", ".ogg"].includes(extname(e.name).toLowerCase()))
+            .map((e) => ({
+                name: basename(e.name, extname(e.name)),
+                file: e.name,
+            }));
+    } catch {
+        return [];
+    }
 }
 
 /**
@@ -64,9 +66,6 @@ async function autocomplete(interaction: AutocompleteInteraction): Promise<void>
     );
 }
 
-// ギルドごとに再生中のプレイヤーを管理するMap
-const activePlayers = new Map<string, boolean>();
-
 /**
  * /soundboard コマンドのハンドラ
  */
@@ -79,11 +78,16 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
         return;
     }
 
-    // 既に再生中かチェック
-    if (activePlayers.get(interaction.guild.id)) {
-        await interaction.reply({ content: "再生に失敗しました。時間をおいて再度実行してください。", flags: MessageFlags.Ephemeral });
-        console.log("Error: Already playing audio.");
-        return;
+    let connection = getVoiceConnection(interaction.guild.id);
+
+    // 既に他の機能（または自身）が音声を再生中かチェックする
+    if (connection) {
+        const subscription = (connection.state as any).subscription;
+        if (subscription && subscription.player.state.status !== AudioPlayerStatus.Idle) {
+            await interaction.reply({ content: "再生に失敗しました。時間をおいて再度実行してください。", flags: MessageFlags.Ephemeral });
+            console.log("Error: VoiceConnection is already busy playing audio.");
+            return;
+        }
     }
 
     const name = interaction.options.getString("name", true);
@@ -98,7 +102,6 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
 
     const member = interaction.member as GuildMember;
     const memberVoiceChannel = member.voice.channel as VoiceChannel | null;
-    let connection = getVoiceConnection(interaction.guild.id);
     let autoConnected = false;
 
     // ボットもユーザーもVCにいない場合
@@ -124,14 +127,11 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
     }
 
     try {
-        const filePath = path.join(audioDir, interaction.guild.id, match.file);
+        const filePath = join(audioDir, interaction.guild.id, match.file);
         const player = createAudioPlayer({
             behaviors: { noSubscriber: NoSubscriberBehavior.Pause },
         });
         const resource = createAudioResource(filePath);
-
-        // 再生中フラグを設定
-        activePlayers.set(interaction.guild.id, true);
 
         connection!.subscribe(player);
         player.play(resource);
@@ -141,7 +141,6 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
 
         player.on(AudioPlayerStatus.Idle, () => {
             player.stop();
-            activePlayers.delete(interaction.guild!.id); // フラグ解除
             // 自動接続した場合は再生後に切断
             if (autoConnected) {
                 connection?.destroy();
@@ -151,7 +150,6 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
 
         player.on("error", (error) => {
             console.log(`[EXCEPTION] Audio player error: ${error}`);
-            activePlayers.delete(interaction.guild!.id); // フラグ解除
             if (autoConnected) {
                 connection?.destroy();
             }
@@ -159,7 +157,6 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
     } catch (error) {
         await interaction.followUp({ content: "Error: 再生に失敗しました。", flags: MessageFlags.Ephemeral });
         console.log(`[EXCEPTION] ${error}`);
-        activePlayers.delete(interaction.guild.id); // フラグ解除
         if (autoConnected) {
             connection?.destroy();
         }

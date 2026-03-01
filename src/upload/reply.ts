@@ -3,8 +3,7 @@ import {
     SlashCommandBuilder,
     MessageFlags,
 } from "discord.js";
-import fs from "fs";
-import path from "path";
+import { join } from "@std/path";
 
 const data = new SlashCommandBuilder()
     .setName("reply")
@@ -50,23 +49,26 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
     }
 
     // 保存先: ./resources/text/<サーバーID>/<コマンド名>.txt
-    const saveDir = path.join("./resources", "text", interaction.guild.id);
+    const saveDir = join("./resources", "text", interaction.guild.id);
     const filename = `${commandName}.txt`;
-    const savePath = path.join(saveDir, filename);
+    const savePath = join(saveDir, filename);
 
     // ファイル重複チェック
-    if (fs.existsSync(savePath)) {
+    try {
+        Deno.statSync(savePath);
         await interaction.followUp({ content: "Error: このコマンド名は既に登録されています。", flags: MessageFlags.Ephemeral });
         console.log(`Error: File already exists at ${savePath}.`);
         return;
+    } catch {
+        // ファイルが存在しない場合は正常
     }
 
     try {
         // ディレクトリ作成
-        fs.mkdirSync(saveDir, { recursive: true });
+        Deno.mkdirSync(saveDir, { recursive: true });
 
         // ファイル保存
-        fs.writeFileSync(savePath, Buffer.from(replyText, "utf-8"));
+        Deno.writeTextFileSync(savePath, replyText);
 
         await interaction.followUp({ content: "テキストコマンドが保存されました。", flags: MessageFlags.Ephemeral });
         console.log(`File is successfully uploaded to ${savePath}.`);

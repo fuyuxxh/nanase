@@ -1,21 +1,30 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
-import dotenv from "dotenv";
-import fs from "fs";
-import { bootStrap } from "./src/main";
+import { bootStrap } from "./src/main.ts";
 
-process.chdir(__dirname);
 const tokenPath = "./config/token.env";
-const isDeveloper = true;
 
-if (!fs.existsSync(tokenPath)) {
+// token.env の存在確認
+try {
+    Deno.statSync(tokenPath);
+} catch {
     console.error(`Error: Make sure the directory "${tokenPath}" exists, or rename "example_token.env" to "token.env".`);
-    process.exit(1);
+    Deno.exit(1);
 }
 
-dotenv.config({ path: tokenPath });
+// .env ファイルを手動パース（dotenv 不要）
+const envContent = Deno.readTextFileSync(tokenPath);
+for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIndex = trimmed.indexOf("=");
+    if (eqIndex === -1) continue;
+    const key = trimmed.slice(0, eqIndex).trim();
+    const value = trimmed.slice(eqIndex + 1).trim();
+    Deno.env.set(key, value);
+}
 
 const developerGuildIds: string[] = JSON.parse(
-    fs.readFileSync("./config/guild.env", "utf-8")
+    Deno.readTextFileSync("./config/guild.env")
 );
 
 const client = new Client({
@@ -31,14 +40,16 @@ client.once(Events.ClientReady, (readyClient) => {
     console.log(`Successfully logged in as: ${readyClient.user.tag}`);
 });
 
+const isDeveloper = true;
+
 // main code import
 bootStrap(client, { isDeveloper, developerGuildIds });
 
-const token = process.env.BOT_TOKEN;
+const token = Deno.env.get("BOT_TOKEN");
 
 if (!token) {
     console.error("Error: Invalid token. Make sure you have added the token to the file.");
-    process.exit(1);
+    Deno.exit(1);
 }
 
 client.login(token);

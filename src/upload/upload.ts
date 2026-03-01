@@ -4,8 +4,7 @@ import {
     MessageFlags,
     Attachment,
 } from "discord.js";
-import fs from "fs";
-import path from "path";
+import { join, extname } from "@std/path";
 
 const audioExtensions = [".mp3", ".wav", ".m4a", ".ogg"];
 const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".mp4", ".jfif"];
@@ -61,12 +60,12 @@ async function execute(
 
     // 禁則文字チェック
     if (/[\\/:*?"<>|]/.test(name)) {
-        await interaction.followUp({ content: 'Error: コマンド名に次の文字は使用できません: \ / : * ? " < > |', flags: MessageFlags.Ephemeral });
+        await interaction.followUp({ content: 'Error: コマンド名に次の文字は使用できません: \\ / : * ? " < > |', flags: MessageFlags.Ephemeral });
         console.log(`Error: Invalid characters in command name "${name}".`);
         return;
     }
 
-    const ext = path.extname(file.name).toLowerCase();
+    const ext = extname(file.name).toLowerCase();
     const filename = `${name}${ext}`;
 
     // 拡張子チェック
@@ -77,24 +76,27 @@ async function execute(
     }
 
     // 保存先: ./resources/<filetype>/<サーバーID>/<ファイル名>
-    const saveDir = path.join("./resources", selectedType, interaction.guild.id);
-    const savePath = path.join(saveDir, filename);
+    const saveDir = join("./resources", selectedType, interaction.guild.id);
+    const savePath = join(saveDir, filename);
 
     // ファイル重複チェック
-    if (fs.existsSync(savePath)) {
+    try {
+        Deno.statSync(savePath);
         await interaction.followUp({ content: "Error: file already exists.", flags: MessageFlags.Ephemeral });
         console.log(`Error: File already exists at ${savePath}.`);
         return;
+    } catch {
+        // ファイルが存在しない場合は正常
     }
 
     try {
         // ディレクトリ作成
-        fs.mkdirSync(saveDir, { recursive: true });
+        Deno.mkdirSync(saveDir, { recursive: true });
 
         // ファイルダウンロード＆保存
         const response = await fetch(file.url);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        fs.writeFileSync(savePath, buffer);
+        const buffer = new Uint8Array(await response.arrayBuffer());
+        Deno.writeFileSync(savePath, buffer);
 
         await interaction.followUp({ content: "ファイルが保存されました。", flags: MessageFlags.Ephemeral });
         console.log(`File is successfully uploaded to ${savePath}.`);
