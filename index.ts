@@ -3,6 +3,8 @@ import { bootStrap } from "./src/main.ts";
 
 const tokenPath = "./config/token.env";
 
+const isDeveloper = true;
+
 // token.env の存在確認
 try {
     Deno.statSync(tokenPath);
@@ -39,8 +41,6 @@ const client = new Client({
 client.once(Events.ClientReady, (readyClient) => {
     console.log(`Successfully logged in as: ${readyClient.user.tag}`);
 });
-
-const isDeveloper = true;
 
 // main code import
 bootStrap(client, { isDeveloper, developerGuildIds });

@@ -56,11 +56,15 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
         const videoInfo = JSON.parse(rawOutput);
         const title = videoInfo.title as string;
 
+        // 推定または実際のファイルサイズを取得
+        const rawSize = videoInfo.filesize_approx || videoInfo.filesize || 0;
+        const sizeStr = rawSize > 0 ? ` (${(rawSize / 1024 / 1024).toFixed(1)}MB)` : "";
+
         const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_");
         const filename = `${safeTitle}.m4a`;
         const tmpPath = join(tmpDir, filename);
 
-        await interaction.followUp({ content: ` "${title}" をダウンロード中...`, flags: MessageFlags.Ephemeral });
+        await interaction.followUp({ content: `"${title}"${sizeStr} をダウンロード中...`, flags: MessageFlags.Ephemeral });
 
         // yt-dlpで音声をm4a形式でダウンロード
         const dlCmd = new Deno.Command(ytdlpPath, {
@@ -78,16 +82,19 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
         }
 
         // ダウンロードされたファイルを確認
+        let fileSize: number;
         try {
-            Deno.statSync(tmpPath);
+            const stat = Deno.statSync(tmpPath);
+            fileSize = stat.size;
         } catch {
             await interaction.followUp({ content: "Error: ダウンロードに失敗しました。", flags: MessageFlags.Ephemeral });
             return;
         }
 
         // Discordにファイルを送信
+        const sizeMB = (fileSize / 1024 / 1024).toFixed(1);
         const attachment = new AttachmentBuilder(tmpPath, { name: filename });
-        await interaction.followUp({ content: `"${title}"`, files: [attachment], flags: MessageFlags.Ephemeral });
+        await interaction.followUp({ content: `"${title}" (${sizeMB}MB)`, files: [attachment], flags: MessageFlags.Ephemeral });
         console.log(`Downloaded: ${filename}`);
 
         // 一時ファイルを削除

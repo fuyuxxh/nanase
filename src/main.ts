@@ -6,6 +6,7 @@ import soundboard from "./upload/soundboard.ts";
 import reply from "./upload/reply.ts";
 import { setupRespondent } from "./upload/respondent.ts";
 import ytdl from "./download/ytdl.ts";
+import twdl from "./download/twdl.ts";
 
 interface Command {
     data: SharedSlashCommand;
@@ -13,7 +14,7 @@ interface Command {
     autocomplete?: (interaction: AutocompleteInteraction) => Promise<void>;
 }
 
-const commands: Command[] = [connect, disconnect, upload, soundboard, reply, ytdl];
+const commands: Command[] = [connect, disconnect, upload, soundboard, reply, ytdl, twdl];
 
 interface BootStrapOptions {
     isDeveloper: boolean;
