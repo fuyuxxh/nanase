@@ -1,9 +1,11 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
 import dotenv from "dotenv";
 import fs from "fs";
-import { registerMessageHandler } from "./src/main";
+import { bootStrap } from "./src/main";
 
+process.chdir(__dirname);
 const tokenPath = "./config/token.env";
+const isDeveloper = true;
 
 if (!fs.existsSync(tokenPath)) {
     console.error(`Error: Make sure the directory "${tokenPath}" exists, or rename "example_token.env" to "token.env".`);
@@ -12,10 +14,15 @@ if (!fs.existsSync(tokenPath)) {
 
 dotenv.config({ path: tokenPath });
 
+const developerGuildIds: string[] = JSON.parse(
+    fs.readFileSync("./config/guild.env", "utf-8")
+);
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.MessageContent,
     ],
 });
@@ -25,7 +32,7 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 // main code import
-registerMessageHandler(client);
+bootStrap(client, { isDeveloper, developerGuildIds });
 
 const token = process.env.BOT_TOKEN;
 
