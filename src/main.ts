@@ -4,6 +4,7 @@ import disconnect from "./gateway/disconnect";
 import upload from "./upload/upload";
 import soundboard from "./upload/soundboard";
 import reply from "./upload/reply";
+import { setupRespondent } from "./upload/respondent";
 
 const commands = [connect, disconnect, upload, soundboard, reply];
 
@@ -13,6 +14,9 @@ interface BootStrapOptions {
 }
 
 export function bootStrap(client: Client, options: BootStrapOptions): void {
+    // 自動返信機能などのイベントリスナをセットアップ
+    setupRespondent(client);
+
     // スラッシュコマンドの登録（Bot起動時）
     client.once(Events.ClientReady, async (readyClient) => {
         const rest = new REST({ version: "10" }).setToken(readyClient.token);
